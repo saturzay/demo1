@@ -1,0 +1,66 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      PREFECT_POSTGRES_DB: ${PREFECT_POSTGRES_DB:-prefect}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+  prefect-server:
+    build:
+      context: .
+      dockerfile: prefect/Dockerfile
+    restart: unless-stopped
+    command: prefect server start --host 0.0.0.0
+    environment:
+      PREFECT_SERVER_API_HOST: 0.0.0.0
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@db:5432/${PREFECT_POSTGRES_DB:-prefect}
+    ports:
+      - "4200:4200"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  prefect-worker:
+    build:
+      context: .
+      dockerfile: prefect/Dockerfile
+    restart: unless-stopped
+    command: prefect worker start --pool default-pool --type process
+    environment:
+      PREFECT_API_URL: ${PREFECT_API_URL:-http://prefect-server:4200/api}
+    volumes:
+      - ./prefect/flows:/app/flows
+    depends_on:
+      - prefect-server
+
+volumes:
+  postgres_data:
