@@ -1,6 +1,8 @@
 services:
   db:
-    image: postgis/postgis:16-3.4
+    # postgis/postgis publishes amd64-only images; imresamu/postgis is a
+    # multi-arch (amd64 + arm64) mirror built from the same upstream sources.
+    image: imresamu/postgis:16-3.6-bookworm
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-app}

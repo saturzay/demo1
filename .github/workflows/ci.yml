@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up environment file
+        run: cp .env.example .env
+
+      - name: Build web image
+        run: docker compose build web
+
+      - name: Start database
+        run: docker compose up -d --wait db
+
+      - name: Run migrations
+        run: docker compose run --rm web python manage.py migrate
+
+      - name: Run tests
+        run: docker compose run --rm web sh -c "pip install -r requirements-dev.txt && pytest"
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
