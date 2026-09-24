@@ -16,14 +16,20 @@ jobs:
       - name: Build web image
         run: docker compose build web
 
+      - name: Build prefect-worker image
+        run: docker compose build prefect-worker
+
       - name: Start database
         run: docker compose up -d --wait db
 
       - name: Run migrations
         run: docker compose run --rm web python manage.py migrate
 
-      - name: Run tests
+      - name: Run web tests
         run: docker compose run --rm web sh -c "pip install -r requirements-dev.txt && pytest"
+
+      - name: Run prefect flow tests
+        run: docker compose run --rm prefect-worker sh -c "pip install -r requirements-dev.txt && pytest tests/"
 
       - name: Tear down
         if: always()
